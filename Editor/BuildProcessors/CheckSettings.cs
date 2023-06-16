@@ -17,7 +17,6 @@ namespace HybridCLR.Editor.BuildProcessors
         public void OnPreprocessBuild(BuildReport report)
         {
             HybridCLRSettings globalSettings = SettingsUtil.HybridCLRSettings;
-#if !UNITY_2020_1_OR_NEWER || !UNITY_IOS
             if (!globalSettings.enable || globalSettings.useGlobalIl2cpp)
             {
                 string oldIl2cppPath = Environment.GetEnvironmentVariable("UNITY_IL2CPP_PATH");
@@ -36,7 +35,6 @@ namespace HybridCLR.Editor.BuildProcessors
                     Debug.Log($"[CheckSettings] UNITY_IL2CPP_PATH 当前值为:'{curIl2cppPath}'，更新为:'{SettingsUtil.LocalIl2CppDir}'");
                 }
             }
-#endif
             if (!globalSettings.enable)
             {
                 return;
@@ -54,25 +52,11 @@ namespace HybridCLR.Editor.BuildProcessors
                 Debug.LogError($"[CheckSettings] 当前ScriptingBackend是:{curScriptingImplementation}，已经自动切换为:{targetScriptingImplementation}");
                 PlayerSettings.SetScriptingBackend(buildTargetGroup, targetScriptingImplementation);
             }
-            ApiCompatibilityLevel curApiCompatibilityLevel = PlayerSettings.GetApiCompatibilityLevel(buildTargetGroup);
-#if UNITY_2021_1_OR_NEWER
-            ApiCompatibilityLevel targetApiCompatibilityLevel = ApiCompatibilityLevel.NET_Unity_4_8;
-#else
-            ApiCompatibilityLevel targetApiCompatibilityLevel = ApiCompatibilityLevel.NET_4_6;
-#endif
-
-
-            if (curApiCompatibilityLevel != targetApiCompatibilityLevel)
-            {
-                Debug.LogError($"[CheckSettings] 当前ApiCompatibilityLevel是:{curApiCompatibilityLevel}，已经自动切换为 {targetApiCompatibilityLevel}。由于下一次打包才生效，主动打断本次打包。");
-                PlayerSettings.SetApiCompatibilityLevel(buildTargetGroup, ApiCompatibilityLevel.NET_4_6);
-                throw new BuildFailedException("ApiCompatibilityLevel error");
-            }
 
             var installer = new Installer.InstallerController();
             if (!installer.HasInstalledHybridCLR())
             {
-                throw new Exception($"你没有初始化HybridCLR，请通过菜单'HybridCLR/Installer'安装");
+                throw new BuildFailedException($"你没有初始化HybridCLR，请通过菜单'HybridCLR/Installer'安装");
             }
 
             HybridCLRSettings gs = SettingsUtil.HybridCLRSettings;
