@@ -1,16 +1,19 @@
+using System;
 using HybridCLR.Editor.Installer;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
 using UnityEditor;
+using System.Reflection;
+using HybridCLR.Editor.Settings;
 #if (UNITY_2020 || UNITY_2021) && UNITY_IOS
 using UnityEditor.Build;
 using UnityEditor.Callbacks;
 using UnityEditor.iOS.Xcode;
 using UnityEngine;
 
-namespace HybridCLR.Editor
+namespace HybridCLR.Editor.BuildProcessors
 {
     public static class AddLil2cppSourceCodeToXcodeproj2021OrOlder
     {
@@ -29,9 +32,8 @@ namespace HybridCLR.Editor
         [PostProcessBuild]
         public static void OnPostProcessBuild(BuildTarget target, string pathToBuiltProject)
         {
-            if (target != BuildTarget.iOS)
+            if (target != BuildTarget.iOS || !HybridCLRSettings.Instance.enable)
                 return;
-
             /*
              *  1. 生成lump，并且添加到工程
                 3. 将libil2cpp目录复制到 Library/. 删除旧的. search paths里修改 libil2cpp/include为libil2cpp
@@ -54,12 +56,17 @@ namespace HybridCLR.Editor
             CopyLibil2cppToXcodeProj(srcLibil2cppDir, dstLibil2cppDir);
             CopyExternalToXcodeProj(srcExternalDir, dstExternalDir);
             var lumpFiles = CreateLumps(dstLibil2cppDir, lumpDir);
-            var extraSources = GetExtraSourceFiles(dstExternalDir);
+            var extraSources = GetExtraSourceFiles(dstExternalDir, dstLibil2cppDir);
             var cflags = new List<string>()
             {
                 "-DIL2CPP_MONO_DEBUGGER_DISABLED",
             };
             ModifyPBXProject(pathToBuiltProject, pbxprojFile, lumpFiles, extraSources, cflags);
+        }
+
+        private static string GetRelativePathFromProj(string path)
+        {
+            return path.Substring(path.IndexOf("Libraries", StringComparison.Ordinal)).Replace('\\', '/');
         }
 
         private static void ModifyPBXProject(string pathToBuiltProject, string pbxprojFile, List<LumpFile> lumpFiles, List<string> extraFiles, List<string> cflags)
@@ -80,14 +87,16 @@ namespace HybridCLR.Editor
 
             foreach (var lumpFile in lumpFiles)
             {
-                string projPathOfFile = $"Classes/Lumps/{Path.GetFileName(lumpFile.lumpFile)}";
+                string lumpFileName = Path.GetFileName(lumpFile.lumpFile);
+                string projPathOfFile = $"Classes/Lumps/{lumpFileName}";
+                string relativePathOfFile = GetRelativePathFromProj(lumpFile.lumpFile);
                 string lumpGuid = proj.FindFileGuidByProjectPath(projPathOfFile);
                 if (!string.IsNullOrEmpty(lumpGuid))
                 {
                     proj.RemoveFileFromBuild(targetGUID, lumpGuid);
                     proj.RemoveFile(lumpGuid);
                 }
-                lumpGuid = proj.AddFile(lumpFile.lumpFile, projPathOfFile, PBXSourceTree.Source);
+                lumpGuid = proj.AddFile(relativePathOfFile, projPathOfFile, PBXSourceTree.Source);
                 proj.AddFileToBuild(targetGUID, lumpGuid);
             }
 
@@ -101,7 +110,7 @@ namespace HybridCLR.Editor
                     proj.RemoveFile(extraFileGuid);
                     //Debug.LogWarning($"remove exist extra file:{projPathOfFile} guid:{extraFileGuid}");
                 }
-                var lumpGuid = proj.AddFile(extraFile, projPathOfFile, PBXSourceTree.Source);
+                var lumpGuid = proj.AddFile(GetRelativePathFromProj(extraFile), projPathOfFile, PBXSourceTree.Source);
                 proj.AddFileToBuild(targetGUID, lumpGuid);
             }
 
@@ -182,7 +191,7 @@ namespace HybridCLR.Editor
                 var lumpFileContent = new List<string>();
                 foreach (var file in cppFiles)
                 {
-                    lumpFileContent.Add($"#include \"{file}\"");
+                    lumpFileContent.Add($"#include \"{GetRelativePathFromProj(file)}\"");
                 }
                 File.WriteAllLines(lumpFile, lumpFileContent, Encoding.UTF8);
                 Debug.Log($"create lump file:{lumpFile}");
@@ -192,24 +201,20 @@ namespace HybridCLR.Editor
         private static List<LumpFile> CreateLumps(string libil2cppDir, string outputDir)
         {
             BashUtil.RecreateDir(outputDir);
-            var cppFiles = Directory.GetFiles(libil2cppDir, "*.cpp", SearchOption.AllDirectories);
-            int maxCppFilePerLump = 50;
+
             string il2cppConfigFile = $"{libil2cppDir}/il2cpp-config.h";
             var lumpFiles = new List<LumpFile>();
-            for (int i = 0; i < (cppFiles.Length + maxCppFilePerLump - 1) / maxCppFilePerLump; i++)
+            int lumpFileIndex = 0;
+            foreach (var cppDir in Directory.GetDirectories(libil2cppDir, "*", SearchOption.AllDirectories).Concat(new string[] {libil2cppDir}))
             {
-                var lumpFile = new LumpFile($"{outputDir}/lump_{i}.cpp", il2cppConfigFile);
-                for (int j = 0; j < maxCppFilePerLump; j++)
+                var lumpFile = new LumpFile($"{outputDir}/lump_{Path.GetFileName(cppDir)}_{lumpFileIndex}.cpp", il2cppConfigFile);
+                foreach (var file in Directory.GetFiles(cppDir, "*.cpp", SearchOption.TopDirectoryOnly))
                 {
-                    int index = i * maxCppFilePerLump + j;
-                    if (index >= cppFiles.Length)
-                    {
-                        break;
-                    }
-                    lumpFile.cppFiles.Add(cppFiles[index]);
+                    lumpFile.cppFiles.Add(file);
                 }
                 lumpFile.SaveFile();
                 lumpFiles.Add(lumpFile);
+                ++lumpFileIndex;
             }
 
             var mmFiles = Directory.GetFiles(libil2cppDir, "*.mm", SearchOption.AllDirectories);
@@ -226,11 +231,22 @@ namespace HybridCLR.Editor
             return lumpFiles;
         }
 
-        private static List<string> GetExtraSourceFiles(string externalDir)
+        private static List<string> GetExtraSourceFiles(string externalDir, string libil2cppDir)
         {
             var files = new List<string>();
-            files.AddRange(Directory.GetFiles($"{externalDir}/zlib", "*.c"));
-            files.Add($"{externalDir}/xxHash/xxhash.c");
+            foreach (string extraDir in new string[]
+            {
+                $"{externalDir}/zlib",
+                $"{externalDir}/xxHash",
+                $"{libil2cppDir}/os/ClassLibraryPAL/brotli",
+            })
+            {
+                if (!Directory.Exists(extraDir))
+                {
+                    continue;
+                }
+                files.AddRange(Directory.GetFiles(extraDir, "*.c", SearchOption.AllDirectories));
+            }
             return files;
         }
     }

@@ -7,6 +7,7 @@ using UnityEngine;
 using Debug = UnityEngine.Debug;
 using System.Text.RegularExpressions;
 using System.Linq;
+using HybridCLR.Editor.Settings;
 
 namespace HybridCLR.Editor.Installer
 {
@@ -24,17 +25,38 @@ namespace HybridCLR.Editor.Installer
         private readonly HybridclrVersionManifest _versionManifest;
         private readonly HybridclrVersionInfo _curDefaultVersion;
 
+        public string PackageVersion { get; private set; }
+
+        public string InstalledLibil2cppVersion { get; private set; }
+
         public InstallerController()
         {
             _curVersion = ParseUnityVersion(Application.unityVersion);
             _versionManifest = GetHybridCLRVersionManifest();
             _curDefaultVersion = _versionManifest.versions.FirstOrDefault(v => v.unity_version == _curVersion.major.ToString());
+            PackageVersion = LoadPackageInfo().version;
+            InstalledLibil2cppVersion = ReadLocalVersion();
         }
 
         private HybridclrVersionManifest GetHybridCLRVersionManifest()
         {
             string versionFile = $"{SettingsUtil.ProjectDir}/{SettingsUtil.HybridCLRDataPathInPackage}/hybridclr_version.json";
             return JsonUtility.FromJson<HybridclrVersionManifest>(File.ReadAllText(versionFile, Encoding.UTF8));
+        }
+
+        private PackageInfo LoadPackageInfo()
+        {
+            string packageJson = $"{SettingsUtil.ProjectDir}/Packages/{SettingsUtil.PackageName}/package.json";
+            return JsonUtility.FromJson<PackageInfo>(File.ReadAllText(packageJson, Encoding.UTF8));
+        }
+
+
+        [Serializable]
+        class PackageInfo
+        {
+            public string name;
+
+            public string version;
         }
 
         [Serializable]
@@ -75,10 +97,6 @@ namespace HybridCLR.Editor.Installer
 
         private static readonly Regex s_unityVersionPat = new Regex(@"(\d+)\.(\d+)\.(\d+)");
 
-        public const int min2020_3_CompatibleMinorVersion = 26;
-        public const int min2021_3_CompatibleMinorVersion = 0;
-        public const int min2022_3_CompatibleMinorVersion = 0;
-
         private UnityVersion ParseUnityVersion(string versionStr)
         {
             var matches = s_unityVersionPat.Matches(versionStr);
@@ -86,9 +104,7 @@ namespace HybridCLR.Editor.Installer
             {
                 return null;
             }
-            // 找最后一个匹配的
             Match match = matches[matches.Count - 1];
-            // Debug.Log($"capture count:{match.Groups.Count} {match.Groups[1].Value} {match.Groups[2].Value}");
             int major = int.Parse(match.Groups[1].Value);
             int minor1 = int.Parse(match.Groups[2].Value);
             int minor2 = int.Parse(match.Groups[3].Value);
@@ -104,44 +120,37 @@ namespace HybridCLR.Editor.Installer
         {
             switch(majorVersion)
             {
-                case 2021: return $"2021.3.{min2021_3_CompatibleMinorVersion}";
-                case 2022: return $"2022.3.{min2022_3_CompatibleMinorVersion}";
-                default: throw new Exception($"not support version:{majorVersion}");
+                case 2020: return $"2020.3.0";
+                case 2021: return $"2021.3.0";
+                case 2022: return $"2022.3.0";
+                default: return $"2020.3.0";
             }
         }
 
-        public bool IsComaptibleVersion()
+        public enum CompatibleType
+        {
+            Compatible,
+            MaybeIncompatible,
+            Incompatible,
+        }
+
+        public CompatibleType GetCompatibleType()
         {
             UnityVersion version = _curVersion;
             if (version == null)
             {
-                return false;
+                return CompatibleType.Incompatible;
             }
             if (version.minor1 != 3)
             {
-                return false;
+                return CompatibleType.MaybeIncompatible;
             }
-            switch (version.major)
-            {
-                case 2020:
-                    {
-                        return version.minor2 >= min2021_3_CompatibleMinorVersion;
-                    }
-                case 2021:
-                    { 
-                        return version.minor2 >= min2021_3_CompatibleMinorVersion;
-                    }
-                case 2022:
-                    {
-                        return version.minor2 >= min2022_3_CompatibleMinorVersion;
-                    }
-                default: throw new Exception($"not support il2cpp_plus branch:{version.major}");
-            }
+            return CompatibleType.Compatible;
         }
 
-        public string HybridclrLocalVersion => _curDefaultVersion.hybridclr.branch;
+        public string HybridclrLocalVersion => _curDefaultVersion?.hybridclr?.branch;
 
-        public string Il2cppPlusLocalVersion => _curDefaultVersion.il2cpp_plus.branch;
+        public string Il2cppPlusLocalVersion => _curDefaultVersion?.il2cpp_plus?.branch;
 
 
         private string GetIl2CppPathByContentPath(string contentPath)
@@ -150,6 +159,24 @@ namespace HybridCLR.Editor.Installer
         }
 
         public string ApplicationIl2cppPath => GetIl2CppPathByContentPath(EditorApplication.applicationContentsPath);
+
+        public string LocalVersionFile => $"{SettingsUtil.LocalIl2CppDir}/libil2cpp/hybridclr/generated/libil2cpp-version.txt";
+
+        private string ReadLocalVersion()
+        {
+            if (!File.Exists(LocalVersionFile))
+            {
+                return null;
+            }
+            return File.ReadAllText(LocalVersionFile, Encoding.UTF8);
+        }
+
+        public void WriteLocalVersion()
+        {
+            InstalledLibil2cppVersion = PackageVersion;
+            File.WriteAllText(LocalVersionFile, PackageVersion, Encoding.UTF8);
+            Debug.Log($"Write installed version:'{PackageVersion}' to {LocalVersionFile}");
+        }
 
         public void InstallDefaultHybridCLR()
         {
@@ -204,9 +231,9 @@ namespace HybridCLR.Editor.Installer
 
         private void RunInitLocalIl2CppData(string editorIl2cppPath, string libil2cppWithHybridclrSourceDir, UnityVersion version)
         {
-            if (!IsComaptibleVersion())
+            if (GetCompatibleType() == CompatibleType.Incompatible)
             {
-                Debug.LogError($"il2cpp 版本不兼容，最小版本为 {GetCurrentUnityVersionMinCompatibleVersionStr()}");
+                Debug.LogError($"Incompatible with current version, minimum compatible version: {GetCurrentUnityVersionMinCompatibleVersionStr()}");
                 return;
             }
             string workDir = SettingsUtil.HybridCLRDataDir;
@@ -231,11 +258,12 @@ namespace HybridCLR.Editor.Installer
 
             if (HasInstalledHybridCLR())
             {
-                Debug.Log("安装成功");
+                WriteLocalVersion();
+                Debug.Log("Install Sucessfully");
             }
             else
             {
-                Debug.LogError("安装失败");
+                Debug.LogError("Installation failed!");
             }
         }
     }

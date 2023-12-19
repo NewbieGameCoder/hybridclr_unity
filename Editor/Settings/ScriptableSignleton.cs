@@ -5,7 +5,7 @@ using UnityEditor;
 using UnityEditorInternal;
 using UnityEngine;
 
-namespace HybridCLR.Editor
+namespace HybridCLR.Editor.Settings
 {
     public class ScriptableSingleton<T> : ScriptableObject where T : ScriptableObject
     {
@@ -31,7 +31,7 @@ namespace HybridCLR.Editor
             }
             else
             {
-                Debug.LogError($"{nameof(ScriptableSingleton<T>)}: 请指定单例存档路径！ ");
+                Debug.LogError($"save location of {nameof(ScriptableSingleton<T>)} is invalid");
             }
             return s_Instance;
         }

@@ -5,6 +5,7 @@ using System.Linq;
 using UnityEditor;
 using UnityEditorInternal;
 using UnityEngine;
+using HybridCLR.Editor.Settings;
 
 
 namespace HybridCLR.Editor
@@ -95,7 +96,7 @@ namespace HybridCLR.Editor
                     {
                         if (allAsses.Contains(assemblyName))
                         {
-                            throw new Exception($"[HotUpdateAssemblyNamesIncludePreserved] assembly:'{assemblyName}' 重复");
+                            throw new Exception($"[HotUpdateAssemblyNamesIncludePreserved] assembly:'{assemblyName}' is duplicated");
                         }
                         allAsses.Add(assemblyName);
                     }

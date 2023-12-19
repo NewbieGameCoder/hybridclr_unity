@@ -19,10 +19,7 @@ namespace HybridCLR.Editor.Commands
             ScriptCompilationSettings scriptCompilationSettings = new ScriptCompilationSettings();
             scriptCompilationSettings.group = group;
             scriptCompilationSettings.target = target;
-            if (developmentBuild)
-            {
-                scriptCompilationSettings.options |= ScriptCompilationOptions.DevelopmentBuild;
-            }
+            scriptCompilationSettings.options = developmentBuild ? ScriptCompilationOptions.DevelopmentBuild : ScriptCompilationOptions.None;
             Directory.CreateDirectory(buildDir);
             ScriptCompilationResult scriptCompilationResult = PlayerBuildInterface.CompilePlayerScripts(scriptCompilationSettings, buildDir);
 #if UNITY_2022
@@ -60,16 +57,34 @@ namespace HybridCLR.Editor.Commands
             CompileDll(BuildTarget.StandaloneWindows64);
         }
 
-        [MenuItem("HybridCLR/CompileDll/Android", priority = 202)]
+        [MenuItem("HybridCLR/CompileDll/MacOS", priority = 202)]
+        public static void CompileDllMacOS()
+        {
+            CompileDll(BuildTarget.StandaloneOSX);
+        }
+
+        [MenuItem("HybridCLR/CompileDll/Linux", priority = 203)]
+        public static void CompileDllLinux()
+        {
+            CompileDll(BuildTarget.StandaloneLinux64);
+        }
+
+        [MenuItem("HybridCLR/CompileDll/Android", priority = 210)]
         public static void CompileDllAndroid()
         {
             CompileDll(BuildTarget.Android);
         }
 
-        [MenuItem("HybridCLR/CompileDll/IOS", priority = 203)]
+        [MenuItem("HybridCLR/CompileDll/IOS", priority = 220)]
         public static void CompileDllIOS()
         {
             CompileDll(BuildTarget.iOS);
+        }
+
+        [MenuItem("HybridCLR/CompileDll/WebGL", priority = 230)]
+        public static void CompileDllWebGL()
+        {
+            CompileDll(BuildTarget.WebGL);
         }
     }
 }
