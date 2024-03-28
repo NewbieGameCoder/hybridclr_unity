@@ -1,8 +1,57 @@
 # 发布日志
 
+## 5.2.0
+
+发布日期 2024.3.25.
+
+### Runtime
+
+- [new] 支持团结引擎
+- [new] 支持函数指针，支持IL2CPP_TYPE_FNPTR类型
+- [fix] 修复SetMdArrElementVarVar_ref指令未SetWriteBarrier的bug
+- [fix] InvokeSingleDelegate当调用一个未补充元数据的泛型函数时，发生崩溃的bug
+- [fix] 修复InterpreterDelegateInvoke调用delegate时，如果delegate指向未补充元数据的泛型函数，发生崩溃的bug
+- [fix] 修复当BlobStream为空时, RawImage::GetBlobFromRawIndex断言index < _streamBlobHeap.size失败的bug
+- [change] 重构metadata index设计，允许分配最多3个64M dll，16个16M dll，64个4M dll，255个1M dll
+
+### Editor
+
+- [new] 支持团结引擎
+- [fix] 修复GenericArgumentContext不支持ElementType.FnPtr的bug
+- [change] 为RuntimeApi添加[Preserve]特性，避免被裁剪
+
+## 5.1.0
+
+发布日期 2024.2.26.
+
+### Runtime
+
+- [fix] 修复2021未实现System.ByReference`1的.ctor及get_Value函数引发的运行错误的问题，il2cpp通过特殊的instrinct函数实现了正常运行
+- [opt] 优化元数据加载，将部分元数据改为延迟加载，大约减少30%的Assembly::Load的执行时间
+- [change] tempRet由Interpreter::Execute的局部变量改为CallDelegateInvoke_xxx的局部变量，减少嵌套过深时栈溢出的可能性
+
+## 5.0.0
+
+发布日期 2024.1.26.
+
+### Runtime
+
+- [new] 恢复对2019支持
+- [fix] 修复未按依赖顺序加载dll，由于在创建Image时缓存了当时的程序集列表，如果被依赖的程序集在本程序集后加载，延迟访问时由于不在缓存程序集列表而出现TypeLoadedException的bug
+
+
+### Editor
+
+- [new] 恢复对2019支持
+- [new] 支持2019版本在iOS平台以源码形式构建
+- [new] 新增 AOTAssemblyMetadataStripper用于剔除AOT dll中非泛型函数元数据
+- [new] 新增 MissingMetadataChecker检查裁剪类型或者函数丢失的问题
+- [opt] 优化 AOTReference计算，如果泛型的所有泛型参数都是class约束，则不加入到需要补充元数据的集合
+- [change] 为了支持团结引擎而作了一些调整（注意，支持团结引擎的il2cpp_plus分支并未公开）
+
 ## 4.0.15
 
-发布日期 2024年1月2日.
+发布日期 2024.1.2.
 
 ### Runtime
 
