@@ -1,5 +1,87 @@
 # 发布日志
 
+## 6.6.0
+
+发布日期 2024.8.12.
+
+### Runtime
+
+- [fix] 修复CustomAttribute的构造或者namedArg包含typeof(T[])参数时崩溃的bug
+- [fix] 修复 T[index].CallMethod() 当CallMethod为泛型类型T的接口函数，并且array的element为T的子类时抛出ArrayTypeMismatchException的bug
+- [fix] 修复MethodBase.GetCurrentMethod未返回正确结果的bug。新增instinct指令MethodBaseGetCurrentMethod
+- [fix] 修复在WebGL之类的平台加载pdb后仍然无法显示堆栈代码行数的bug
+- [fix] 修复调用子解释器函数后返回，再打印日志时，由于frame->ip未重新设置为&ip，导致后续打印的代码行数永远为调用子函数的代码行数的bug
+- [fix] 修复调用子解释器函数时，由于frame->ip指向下一条指令，导致父函数的代码行数显示为下一条语句的行数的bug
+- [merge] 合并2021.3.42f1及2022.3.41f1的il2cpp的代码，修复2021.3.42f1及2022.3.40f1新增il2cpp_codegen_memcpy_with_write_barrier函数引发的编译错误
+
+## 6.5.0
+
+发布日期 2024.8.5.
+
+### Runtime
+
+- [new] 2019-2020版本热更新函数堆栈也能正常显示代码文件及行号
+- [merge] 合并Unity 6000.0.1-6000.0.10的il2cpp改动
+
+## 6.4.0
+
+发布日期 2024.7.25.
+
+### Runtime
+
+- [new] 支持`Assembly.Load(byte[] assData, byte[] pdbData)`加载dll和pdb符号文件，在2021+版本打印函数堆栈时能显示正确的代码文件和行号
+- [fix] 修复团结引擎平台InterpreterImage::GetEventInfo和GetPropertyInfo时有可能未初始化method，导致getter之类的函数为空的bug
+- [opt] 优化StackTrace和UnityEngine.Debug打印的函数栈顺序，大多数情况下可以在正确的栈位置地显示解释器函数
+- [opt] 优化元数据内存
+
+### Editor
+
+- [fix][严重] 修复生成MethodBridge过程中计算等价类时未考虑到ClassLayout、Layout和FieldOffset因素的bug
+- [fix] 修复Library/PlayerDataCache目录不存在时，PatchScriptingAssembliesJsonHook运行异常的bug
+
+## 6.3.0
+
+发布日期 2024.7.15.
+
+### Runtime
+
+- [opt] 大幅优化metadata元数据内存，内存占用相比6.2.0版本减少了15-40%
+- [fix] 修复Transform时未释放IRBasicBlock中insts内存的bug，此bug大约0.7-1.6倍dll大小内存泄露
+- [fix] 修复ClassFieldLayoutCalculator内存泄露的bug
+- [fix] 修复 MetadataAllocT 错误使用 HYBRIDCLR_MALLOC的bug，正确应该是 HYBRIDCLR_METADATA_MALLOC
+- [opt] 优化Interpreter::Execute占用的原生栈大小，避免嵌套过深时出现栈溢出的错误
+
+### Editor
+
+- [fix] 修复 Unity 2022导出的xcode工程包含多个ShellScript片段时错误地删除了非重复片断的bug
+- [fix] 修复微信小游戏平台当TextureCompression非默认值时临时目录名为WinxinMiniGame{xxx}，导致没有成功修改scriptingassemblies.json文件的bug
+- [fix] 修复团结引擎微信小游戏平台由于同时定义了UNITY_WEIXINMINIGAME和UNITY_WEBGL宏，导致从错误路径查找scriptingassemblies.json文件失败，运行时出现脚本missing的bug
+
+## 6.2.0
+
+发布日期 2024.7.1.
+
+### Runtime
+
+- [merge] 合并2021.3.27f1-2021.3.40f1版本改动
+- [opt] 优化metadata元数据内存，内存占用减少了20-25%
+- [opt] 优化枚举类型调用GetHashCode的实现，不再产生GC
+
+## 6.1.0
+
+发布日期 2024.6.17.
+
+### Runtime
+
+- [merge] 合并2022.3.23f1-2022.3.33f1版本改动，修复对2022.3.33版本不兼容的问题
+- [new] 支持2022.3.33版本新增支持的函数返回值Attribute
+- [fix] 修复解释部分FieldInfo调用GetFieldMarshaledSizeForField时崩溃的bug
+
+### Editor
+
+- [fix] 升级dnlib版本，修复ModuleMD保存dll时将未加Assembly限定的mscorlib程序集中类型的程序集设置为当前程序集的严重bug
+- [fix] 修复`Generate/LinkXml`生成的link.xml中对UnityEngine.Debug preserve all导致在Unity 2023及更高版本的iOS、visionOS等平台上出现Undefined symbols for architecture arm64: "CheckApplicationIntegrity(IntegrityCheckLevel)" 编译错误的问题。此bug由Unity引起，我们通过在生成link.xml时忽略UnityEngine.Debug类来临时解决这个问题
+
 ## 6.0.0
 
 发布日期 2024.6.11.
