@@ -13,7 +13,14 @@ namespace HybridCLR.Editor.AOT
     {
         public static byte[] Strip(byte[] assemblyBytes)
         {
-            var mod = ModuleDefMD.Load(assemblyBytes);
+            var context = ModuleDef.CreateModuleContext();
+            var readerOption = new ModuleCreationOptions(context)
+            {
+                Runtime = CLRRuntimeReaderKind.Mono
+            };
+            var mod = ModuleDefMD.Load(assemblyBytes, readerOption);
+            // remove all resources
+            mod.Resources.Clear();
             foreach (var type in mod.GetTypes())
             {
                 if (type.HasGenericParameters)
@@ -31,8 +38,8 @@ namespace HybridCLR.Editor.AOT
             }
             var writer = new System.IO.MemoryStream();
             var options = new ModuleWriterOptions(mod);
-            options.MetadataOptions.Flags |= MetadataFlags.PreserveAll;
-            mod.Write(writer);
+            options.MetadataOptions.Flags |= MetadataFlags.PreserveRids;
+            mod.Write(writer, options);
             writer.Flush();
             return writer.ToArray();
         }
